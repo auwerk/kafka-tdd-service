@@ -10,7 +10,7 @@ import org.apache.kafka.clients.producer.Producer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.auwerk.kafka.tddservice.service.HelloKafkaService;
+import org.auwerk.kafka.tddservice.service.KafkaPollingService;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.Before;
@@ -54,7 +54,7 @@ public class KafkaSpringIntegrationTests {
 	@Autowired
 	private ProducerFactory<String, String> kafkaProducerFactory;
 	@Autowired
-	private HelloKafkaService helloKafkaService;
+	private KafkaPollingService kafkaPollingService;
 
 	private Producer<String, String> kafkaProducer;
 	private Consumer<String, String> kafkaConsumer;
@@ -96,7 +96,7 @@ public class KafkaSpringIntegrationTests {
 		kafkaProducer.send(new ProducerRecord<String, String>(topicId, MY_KEY, MY_VALUE_2));
 		kafkaProducer.flush();
 
-		List<String> values = helloKafkaService.pollValues();
+		List<String> values = kafkaPollingService.pollValues();
 		Assert.assertTrue(values.size() == 2);
 		Assert.assertEquals(String.format("%s:%s", MY_KEY, MY_VALUE_2), values.get(1));
 	}

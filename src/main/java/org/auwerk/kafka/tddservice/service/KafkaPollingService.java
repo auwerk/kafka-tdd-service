@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @Service
-public class HelloKafkaService {
+public class KafkaPollingService {
 
 	@Value("${kafka-tdd-service.topic-id:undefined-topic}")
 	private String topicId;
