@@ -20,7 +20,7 @@ import org.springframework.kafka.test.rule.EmbeddedKafkaRule;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
 
 /**
- * Простые интеграционные тесты Кафки
+ * Simple Kafka integration tests
  * 
  * @author auwerk
  *
@@ -64,10 +64,6 @@ public class KafkaIntegrationTests {
 		}
 	}
 
-	/**
-	 * Основной тест интеграции. Отправка сообщения, его получение и проверка
-	 * содержимого
-	 */
 	@Test
 	public void kafkaIntegrationWorks() {
 		kafkaProducer.send(new ProducerRecord<String, String>(MY_TOPIC_ID, MY_KEY, MY_VALUE));

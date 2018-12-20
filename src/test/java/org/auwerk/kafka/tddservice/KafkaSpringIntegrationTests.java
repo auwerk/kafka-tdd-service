@@ -31,7 +31,7 @@ import org.springframework.kafka.test.utils.KafkaTestUtils;
 import org.springframework.test.context.junit4.SpringRunner;
 
 /**
- * Интеграционные тесты Кафки с использованием Spring
+ * Kafka integration tests in Spring context
  * 
  * @author auwerk
  *
@@ -79,9 +79,6 @@ public class KafkaSpringIntegrationTests {
 		}
 	}
 
-	/**
-	 * Consumer внутри самого теста
-	 */
 	@Test
 	public void kafkaSpringIntegrationWorks() {
 		kafkaProducer.send(new ProducerRecord<String, String>(topicId, MY_KEY, MY_VALUE));
@@ -94,27 +91,16 @@ public class KafkaSpringIntegrationTests {
 		Assert.assertEquals(MY_VALUE, consumerRecord.value());
 	}
 
-	/**
-	 * Consumer внутри сервиса
-	 */
 	@Test
 	public void kafkaHelloServiceWorks() {
 		kafkaProducer.send(new ProducerRecord<String, String>(topicId, MY_KEY, MY_VALUE_2));
 		kafkaProducer.flush();
 
 		List<String> values = helloKafkaService.pollValues();
-		// Если этот тест запускался вторым после kafkaSpringIntegrationWorks(),
-		// то в топике будет 2 записи. Этому методу предназначена вторая.
 		Assert.assertTrue(values.size() == 2);
 		Assert.assertEquals(String.format("%s:%s", MY_KEY, MY_VALUE_2), values.get(1));
 	}
 
-	/**
-	 * Конфигурация контекста Spring для тестов Кафки
-	 * 
-	 * @author auwerk
-	 *
-	 */
 	@TestConfiguration
 	public static class KafkaSpringIntegrationTestsConfiguration {
 
