@@ -1,19 +1,14 @@
 package org.auwerk.kafka.tddservice;
 
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
+import java.util.concurrent.ExecutionException;
 
-import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.producer.Producer;
-import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
-import org.auwerk.kafka.tddservice.service.KafkaPollingService;
-import org.junit.After;
+import org.auwerk.kafka.tddservice.service.KafkaListenerService;
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -22,9 +17,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaProducerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.kafka.core.ProducerFactory;
 import org.springframework.kafka.test.rule.EmbeddedKafkaRule;
 import org.springframework.kafka.test.utils.KafkaTestUtils;
@@ -41,7 +38,6 @@ import org.springframework.test.context.junit4.SpringRunner;
 public class KafkaSpringIntegrationTests {
 	private static final String MY_KEY = "my-key";
 	private static final String MY_VALUE = "my-value";
-	private static final String MY_VALUE_2 = "my-value-2";
 
 	@ClassRule
 	public static EmbeddedKafkaRule embeddedKafkaRule = new EmbeddedKafkaRule(1, true);
@@ -50,73 +46,51 @@ public class KafkaSpringIntegrationTests {
 	private String topicId;
 
 	@Autowired
-	private ConsumerFactory<String, String> kafkaConsumerFactory;
+	private KafkaTemplate<String, String> kafkaTemplate;
 	@Autowired
-	private ProducerFactory<String, String> kafkaProducerFactory;
-	@Autowired
-	private KafkaPollingService kafkaPollingService;
-
-	private Producer<String, String> kafkaProducer;
-	private Consumer<String, String> kafkaConsumer;
-
-	@Before
-	public void before() {
-		kafkaProducer = kafkaProducerFactory.createProducer();
-
-		kafkaConsumer = kafkaConsumerFactory.createConsumer();
-		kafkaConsumer.subscribe(Collections.singleton(topicId));
-	}
-
-	@After
-	public void after() {
-		if (kafkaConsumer != null) {
-			kafkaConsumer.close();
-			kafkaConsumer = null;
-		}
-		if (kafkaProducer != null) {
-			kafkaProducer.close();
-			kafkaProducer = null;
-		}
-	}
+	private KafkaListenerService kafkaListenerService;
 
 	@Test
-	public void kafkaSpringIntegrationWorks() {
-		kafkaProducer.send(new ProducerRecord<String, String>(topicId, MY_KEY, MY_VALUE));
-		kafkaProducer.flush();
-
-		var consumerRecord = KafkaTestUtils.getSingleRecord(kafkaConsumer, topicId);
-
-		Assert.assertNotNull(consumerRecord);
-		Assert.assertEquals(MY_KEY, consumerRecord.key());
-		Assert.assertEquals(MY_VALUE, consumerRecord.value());
-	}
-
-	@Test
-	public void kafkaPollingServiceWorks() {
-		kafkaProducer.send(new ProducerRecord<String, String>(topicId, MY_KEY, MY_VALUE_2));
-		kafkaProducer.flush();
-
-		List<String> values = kafkaPollingService.pollValues();
-		Assert.assertTrue("should receive at least one value", values.size() > 0);
-		//Assert.assertEquals(String.format("%s:%s", MY_KEY, MY_VALUE_2), values.get(1));
+	public void kafkaListenerServiceWorks() {
+		try {
+			var future = kafkaListenerService.getRecentMessage();
+			kafkaTemplate.send(topicId, MY_KEY, MY_VALUE);
+			Assert.assertEquals(MY_VALUE, future.get());
+		} catch (InterruptedException | ExecutionException ex) {
+			Assert.fail("future fail");
+		}
 	}
 
 	@TestConfiguration
 	public static class KafkaSpringIntegrationTestsConfiguration {
 
 		@Bean
-		public ProducerFactory<?, ?> kafkaProducerFactory() {
+		public ProducerFactory<String, String> kafkaProducerFactory() {
 			var producerConfigs = new HashMap<>(KafkaTestUtils.producerProps(embeddedKafkaRule.getEmbeddedKafka()));
-			return new DefaultKafkaProducerFactory<>(producerConfigs, new StringSerializer(), new StringSerializer());
+			producerConfigs.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+			producerConfigs.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+			return new DefaultKafkaProducerFactory<>(producerConfigs);
 		}
 
 		@Bean
-		public ConsumerFactory<?, ?> kafkaConsumerFactory() {
+		public KafkaTemplate<String, String> kafkaTemplate() {
+			return new KafkaTemplate<>(kafkaProducerFactory());
+		}
+
+		@Bean
+		public ConsumerFactory<String, String> kafkaConsumerFactory() {
 			var consumerConfigs = new HashMap<>(
 					KafkaTestUtils.consumerProps("consumer", "false", embeddedKafkaRule.getEmbeddedKafka()));
-			consumerConfigs.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
-			return new DefaultKafkaConsumerFactory<>(consumerConfigs, new StringDeserializer(),
-					new StringDeserializer());
+			consumerConfigs.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+			consumerConfigs.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+			return new DefaultKafkaConsumerFactory<>(consumerConfigs);
+		}
+
+		@Bean
+		public ConcurrentKafkaListenerContainerFactory<String, String> kafkaListenerContainerFactory() {
+			var containerFactory = new ConcurrentKafkaListenerContainerFactory<String, String>();
+			containerFactory.setConsumerFactory(kafkaConsumerFactory());
+			return containerFactory;
 		}
 
 	}
