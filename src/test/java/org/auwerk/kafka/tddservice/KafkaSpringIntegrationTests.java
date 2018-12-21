@@ -1,7 +1,7 @@
 package org.auwerk.kafka.tddservice;
 
 import java.util.HashMap;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -51,14 +51,12 @@ public class KafkaSpringIntegrationTests {
 	private KafkaListenerService kafkaListenerService;
 
 	@Test
-	public void kafkaListenerServiceWorks() {
-		try {
-			var future = kafkaListenerService.getRecentMessage();
-			kafkaTemplate.send(topicId, MY_KEY, MY_VALUE);
-			Assert.assertEquals(MY_VALUE, future.get());
-		} catch (InterruptedException | ExecutionException ex) {
-			Assert.fail("future fail");
-		}
+	public void kafkaListenerServiceWorks() throws InterruptedException {
+		kafkaTemplate.send(topicId, MY_KEY, MY_VALUE);
+		kafkaListenerService.getLatch().await(200, TimeUnit.MILLISECONDS);
+
+		Assert.assertEquals(0, kafkaListenerService.getLatch().getCount());
+		Assert.assertEquals(MY_VALUE, kafkaListenerService.getRecentMessage());
 	}
 
 	@TestConfiguration
