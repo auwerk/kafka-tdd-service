@@ -7,13 +7,14 @@ import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.auwerk.kafka.tddservice.config.KafkaTddServiceProperties;
 import org.auwerk.kafka.tddservice.service.KafkaListenerService;
 import org.junit.Assert;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -42,9 +43,6 @@ public class KafkaSpringIntegrationTests {
 	@ClassRule
 	public static EmbeddedKafkaRule embeddedKafkaRule = new EmbeddedKafkaRule(1, true);
 
-	@Value("${kafka-tdd-service.topic-id:undefined-topic}")
-	private String topicId;
-
 	@Autowired
 	private KafkaTemplate<String, String> kafkaTemplate;
 	@Autowired
@@ -52,7 +50,7 @@ public class KafkaSpringIntegrationTests {
 
 	@Test
 	public void kafkaListenerServiceWorks() throws InterruptedException {
-		kafkaTemplate.send(topicId, MY_KEY, MY_VALUE);
+		kafkaTemplate.sendDefault(MY_KEY, MY_VALUE);
 		kafkaListenerService.getLatch().await(200, TimeUnit.MILLISECONDS);
 
 		Assert.assertEquals(0, kafkaListenerService.getLatch().getCount());
@@ -60,7 +58,13 @@ public class KafkaSpringIntegrationTests {
 	}
 
 	@TestConfiguration
+	@EnableConfigurationProperties(KafkaTddServiceProperties.class)
 	public static class KafkaSpringIntegrationTestsConfiguration {
+		private final KafkaTddServiceProperties properties;
+
+		public KafkaSpringIntegrationTestsConfiguration(KafkaTddServiceProperties properties) {
+			this.properties = properties;
+		}
 
 		@Bean
 		public ProducerFactory<String, String> kafkaProducerFactory() {
@@ -72,7 +76,9 @@ public class KafkaSpringIntegrationTests {
 
 		@Bean
 		public KafkaTemplate<String, String> kafkaTemplate() {
-			return new KafkaTemplate<>(kafkaProducerFactory());
+			var template = new KafkaTemplate<>(kafkaProducerFactory());
+			template.setDefaultTopic(properties.getTopicId());
+			return template;
 		}
 
 		@Bean
